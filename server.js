@@ -1,54 +1,31 @@
-const admin = require("firebase-admin");
-const find = require('local-devices');
-const serviceAccount = require("./serviceAccountKey.json");
+const puppeteer = require('puppeteer');
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://securitywifi-653bd-default-rtdb.firebaseio.com"
-});
+async function blockOnRouter(macAddress) {
+    const browser = await puppeteer.launch({ headless: true }); // Орқа фонда браузерни очиш
+    const page = await browser.newPage();
 
-const db = admin.database();
-const devicesRef = db.ref("wifi_devices");
-const blockedRef = db.ref("blocked_devices");
-
-// Ўзингизнинг қурилмаларингиз MAC манзилларини шу ерга ёзинг (Whitelist)
-const myTrustedDevices = [
-    "00:11:22:33:44:55", // Сизнинг телефонингиз MAC манзили
-    "AA:BB:CC:DD:EE:FF"  // Сизнинг компьютерингиз
-];
-
-async function scanAndProtect() {
-    console.log("🛡️ Хавфсизлик сканери ишга тушди...");
     try {
-        const devices = await find();
+        // 1. Роутер панелига кириш
+        await page.goto('http://192.168.101.1');
         
-        devices.forEach(async (device) => {
-            // Агар қурилма меники бўлмаса (Оқ рўйхатда йўқ бўлса)
-            if (!myTrustedDevices.includes(device.mac)) {
-                console.log(`⚠️ ДИҚҚАТ! Бегона қурилма аниқланди: IP: ${device.ip}, MAC: ${device.mac}`);
-                
-                // 1. Уни базада "Шубҳали" деб белгилаш
-                device.status = "BLOCKED"; 
-                
-                // 2. Уни Firebase-даги "blocked_devices" папкасига алоҳида сақлаш
-                await blockedRef.child(device.mac.replace(/:/g, "-")).set({
-                    ...device,
-                    detectedAt: new Date().toISOString()
-                });
-            } else {
-                device.status = "TRUSTED";
-            }
-        });
+        // 2. Логин ва паролни киритиш
+        await page.type('#username', 'admin'); 
+        await page.type('#password', 'admin');
+        await page.click('#login_button');
 
-        // Маълумотларни базага янгилаш
-        await devicesRef.set(devices);
-        console.log("✅ Мониторинг янгиланди.");
+        // 3. Security -> MAC Filter бўлимига ўтиш
+        await page.waitForNavigation();
+        await page.goto('http://192.168.101.1/mac_filter_settings.asp'); // Манзил роутер менюсига қараб фарқ қилиши мумкин
 
+        // 4. Бегона MAC манзилни қўшиш ва сақлаш
+        await page.type('#mac_address_field', macAddress);
+        await page.click('#add_button');
+        await page.click('#save_apply');
+
+        console.log(`🚫 Қурилма роутер даражасида блокланди: ${macAddress}`);
     } catch (err) {
-        console.error("❌ Хатолик:", err);
+        console.error("Роутерда блоклашда хатолик:", err);
+    } finally {
+        await browser.close();
     }
 }
-
-// Ҳар 30 сонияда текшириш
-setInterval(scanAndProtect, 30000);
-scanAndProtect();
