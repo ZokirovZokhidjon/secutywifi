@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wi-Fi Назорат Панели</title>
+    <style>
+        :root {
+            --primary: #2563eb; --danger: #ef4444; --success: #22c55e;
+            --bg: #f8fafc; --card: #ffffff; --text: #1e293b;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 600px; }
+        header { text-align: center; margin-bottom: 30px; }
+        .status-card { background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .status-dot { height: 12px; width: 12px; background: var(--success); border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .device-item { background: var(--card); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--primary); margin-bottom: 15px; transition: 0.2s; }
+        .device-info h4 { margin: 0; font-size: 16px; }
+        .device-info p { margin: 5px 0 0; font-size: 13px; color: #64748b; }
+        .btn-block { background: var(--danger); color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; }
+        .refresh-btn { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 16px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h2>Wi-Fi Monitor</h2>
+        <p>Тармоқдаги ҳақиқий қурилмалар</p>
+    </header>
+    <div class="status-card">
+        <div><span class="status-dot"></span><strong>Ҳолат:</strong> Онлайн</div>
+        <div id="count">Қурилмалар: 0</div>
+    </div>
+    <div id="deviceList">
+        <p style="text-align:center;">Node.js серверига уланилмоқда...</p>
+    </div>
+    <button class="refresh-btn" onclick="fetchDevices()">Янгилаш</button>
+</div>
+
+<script>
+    async function fetchDevices() {
+        const list = document.getElementById('deviceList');
+        try {
+            // Node.js серверимиздан маълумот оламиз
+            const response = await fetch('http://localhost:3000/devices');
+            const devices = await response.json();
+            
+            list.innerHTML = '';
+            document.getElementById('count').innerText = `Қурилмалар: ${devices.length}`;
+            
+            devices.forEach(d => {
+                list.innerHTML += `
+                    <div class="device-item">
+                        <div class="device-info">
+                            <h4>${d.name || 'Noma'lum қурилма'}</h4>
+                            <p>IP: ${d.ip} | MAC: ${d.mac}</p>
+                        </div>
+                        <button class="btn-block" onclick="block('${d.mac}')">Узиш</button>
+                    </div>`;
+            });
+        } catch (err) {
+            list.innerHTML = '<p style="color:red; text-align:center;">Сервер ишламаяпти! <br> Локал серверни (server.js) ёқинг.</p>';
+        }
+    }
+    
+    function block(mac) {
+        alert("Блоклаш сўрови юборилди: " + mac);
+    }
+
+    setInterval(fetchDevices, 5000); // Ҳар 5 сонияда янгилаб туради
+    window.onload = fetchDevices;
+</script>
+</body>
+</html>
